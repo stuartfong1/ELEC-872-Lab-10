@@ -19,16 +19,30 @@ def get_device():
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def load_adult(seed=SEED, device=None, verbose=True):
+def load_adult(args, seed=SEED, device=None, verbose=True):
     """Returns a dict with the training dataset, test tensors and the number of features."""
     device = device or get_device()
     adult = fetch_openml("adult", version=2, as_frame=True)
     df = adult.frame.dropna().reset_index(drop=True)
 
     y = df["class"].astype(str).str.strip().isin([">50K", ">50K."]).astype(np.float32).values
-    z = (df["sex"].astype(str).str.strip() == "Male").astype(np.float32).values
+    if args.q8_protected_race:
+        z = (df["race"].astype(str).str.strip() == "White").astype(np.float32).values
+        X_df = df.drop(columns=["class", "race", "fnlwgt"])
+    else:
+        z = (df["sex"].astype(str).str.strip() == "Male").astype(np.float32).values
+        X_df = df.drop(columns=["class", "sex", "fnlwgt"])
 
-    X_df = df.drop(columns=["class", "sex", "fnlwgt"])
+    # # Q5) Get correlations with sex
+    # pd.set_option('display.max_rows', None)
+    # z = df["sex"].astype(str).str.strip() == "Male"
+    # cat_cols = df.select_dtypes(include=["category", "object"]).columns.tolist()
+    # df = pd.get_dummies(df, columns=cat_cols, dtype=np.float32)
+    # correlations = df.corrwith(z, numeric_only=True)
+    # correlations = correlations.sort_values(ascending=False)
+    # print(correlations)
+    # quit()
+
     cat_cols = X_df.select_dtypes(include=["category", "object"]).columns.tolist()
     num_cols = [c for c in X_df.columns if c not in cat_cols]
     X_df = pd.get_dummies(X_df, columns=cat_cols, dtype=np.float32)
